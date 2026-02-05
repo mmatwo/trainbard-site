@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrainBard — Pine Script Backtesting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ==============================
+       DESIGN TOKENS — edit here only
+       ============================== */
+    :root {
+      --color-highlight: #9DD2EF;
+      --color-bg:   #FFFFFF;
+      --color-text: #000000;
+      --tier-1: 1.0;
+      --tier-2: 0.85;
+      --tier-3: 0.70;
+      --tier-4: 0.55;
+      --tier-5: 0.40;
+      --text-1: rgba(0, 0, 0, var(--tier-1));
+      --text-2: rgba(0, 0, 0, var(--tier-2));
+      --text-3: rgba(0, 0, 0, var(--tier-3));
+      --text-4: rgba(0, 0, 0, var(--tier-4));
+      --text-5: rgba(0, 0, 0, var(--tier-5));
+      --border: rgba(0, 0, 0, 0.12);
+      --surface: rgba(0, 0, 0, 0.04);
+      --line-buyhold: rgba(0, 0, 0, 0.85);
+      --font-body: 'IBM Plex Sans', sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+      --page-margin: 20px;
+    }
+
+    [data-theme="dark"] {
+      --color-bg:   #000000;
+      --color-text: #FFFFFF;
+      --text-1: rgba(255, 255, 255, var(--tier-1));
+      --text-2: rgba(255, 255, 255, var(--tier-2));
+      --text-3: rgba(255, 255, 255, var(--tier-3));
+      --text-4: rgba(255, 255, 255, var(--tier-4));
+      --text-5: rgba(255, 255, 255, var(--tier-5));
+      --border: rgba(255, 255, 255, 0.12);
+      --surface: rgba(255, 255, 255, 0.04);
+      --line-buyhold: rgba(255, 255, 255, 0.85);
+    }
+
+    @media (max-width: 410px) {
+      :root { --page-margin: 10px; }
+      [data-theme="dark"] { --page-margin: 10px; }
+    }
+
+    /* ==============================
+       RESET & BASE
+       ============================== */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-body);
+      background: var(--color-bg);
+      color: var(--text-1);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--text-1);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      text-decoration-thickness: 1px;
+    }
+    a:hover {
+      color: var(--color-highlight);
+      font-weight: 500;
+    }
+
+    /* ==============================
+       LAYOUT
+       ============================== */
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding-left: var(--page-margin);
+      padding-right: var(--page-margin);
+    }
+
+    /* ==============================
+       NAV
+       ============================== */
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 0;
+      max-width: 960px;
+      margin: 0 auto;
+      padding-left: var(--page-margin);
+      padding-right: var(--page-margin);
+    }
+    .logo {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text-1);
+      text-decoration: none;
+    }
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+    .nav-right a { font-size: 14px; color: var(--text-3); }
+    .theme-toggle {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-3);
+      padding: 5px 12px;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+    }
+    .theme-toggle:hover { color: var(--text-1); border-color: var(--text-3); }
+
+    /* ==============================
+       HERO
+       ============================== */
+    .hero { padding: 80px 0 32px; text-align: center; }
+    .hero h1 {
+      font-family: var(--font-mono);
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      color: var(--text-1);
+      margin-bottom: 20px;
+    }
+    .hero p {
+      font-size: 18px;
+      color: var(--text-3);
+      max-width: 520px;
+      margin: 0 auto 32px;
+      font-weight: 300;
+    }
+    .hero-links { display: flex; justify-content: center; }
+    .hero-links a { font-size: 15px; color: var(--text-2); }
+
+    /* ==============================
+       3D PERSPECTIVE
+       ============================== */
+    .perspective-section { padding: 0 0 10px; }
+    .perspective-scene {
+      perspective: 1100px;
+      perspective-origin: 50% 40%;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      height: 380px;
+      position: relative;
+      padding-top: 90px;
+    }
+    .stack {
+      transform-style: preserve-3d;
+      transform: rotateX(58deg) rotateZ(-32deg);
+      position: relative;
+      width: 370px;
+      height: 230px;
+    }
+
+    /* Base layer styles */
+    .stack-layer {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border: 1px solid var(--border);
+      background: var(--color-bg);
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-4);
+      overflow: hidden;
+      /* Start collapsed — JS will fan them out */
+      transform: translateZ(calc(var(--layer-z-base, 0) * 1px));
+      will-change: transform;
+    }
+
+    /*
+      Each layer stores its collapsed and expanded Z positions as CSS vars.
+      Collapsed: layers stacked tight. Expanded: fanned out.
+      JS interpolates between these based on scroll.
+    */
+    .stack-layer:nth-child(1) { --layer-z-collapsed: 0;   --layer-z-expanded: 0;   --layer-z-base: 0;   background: var(--surface); }
+    .stack-layer:nth-child(2) { --layer-z-collapsed: 3;   --layer-z-expanded: 30;  --layer-z-base: 3;   background: var(--surface); }
+    .stack-layer:nth-child(3) { --layer-z-collapsed: 6;   --layer-z-expanded: 62;  --layer-z-base: 6;   }
+    .stack-layer:nth-child(4) { --layer-z-collapsed: 9;   --layer-z-expanded: 96;  --layer-z-base: 9;   }
+    .stack-layer:nth-child(5) { --layer-z-collapsed: 12;  --layer-z-expanded: 132; --layer-z-base: 12;  }
+    .stack-layer:nth-child(6) { --layer-z-collapsed: 15;  --layer-z-expanded: 170; --layer-z-base: 15;  }
+    .stack-layer:nth-child(7) { --layer-z-collapsed: 18;  --layer-z-expanded: 210; --layer-z-base: 18;  }
+    .stack-layer:nth-child(8) {
+      --layer-z-collapsed: 21;  --layer-z-expanded: 252; --layer-z-base: 21;
+      border-color: var(--color-highlight);
+    }
+
+    .layer-label {
+      font-size: 9px;
+      color: var(--text-5);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .layer-highlight { color: var(--color-highlight); }
+
+    .mini-code { font-size: 9.5px; line-height: 1.45; color: var(--text-4); }
+    .mini-code .kw { color: var(--color-highlight); }
+    .mini-code .cm { color: var(--text-5); }
+
+    /* Dense data grid (bottom layers) */
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 2px;
+      margin-top: 4px;
+    }
+    .data-cell {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      height: 14px;
+      font-size: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-5);
+    }
+    .data-grid-wide {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 2px;
+      margin-top: 4px;
+    }
+    .data-grid-wide .data-cell {
+      height: 12px;
+      font-size: 6.5px;
+    }
+
+    /* Parameter sweep grid */
+    .param-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 1px;
+      margin-top: 6px;
+    }
+    .param-cell {
+      height: 10px;
+      background: var(--border);
+      opacity: 0.4;
+    }
+    .param-cell.active {
+      background: var(--color-highlight);
+      opacity: 0.3;
+    }
+
+    /* Iteration lines (mini equity curves in backtest layers) */
+    .iter-lines svg {
+      width: 100%;
+      height: 65px;
+      margin-top: 4px;
+    }
+
+    /* Shadow */
+    .stack::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: var(--border);
+      transform: translateZ(-10px);
+      filter: blur(24px);
+    }
+
+    /* ==============================
+       FEATURES
+       ============================== */
+    .features { padding: 60px 0; border-top: 1px solid var(--border); }
+    .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
+    .feature h3 {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-1);
+    }
+    .feature p { font-size: 15px; color: var(--text-3); margin-bottom: 16px; font-weight: 300; }
+    .feature-detail {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-4);
+      line-height: 1.8;
+    }
+    .feature-detail .hl { color: var(--color-highlight); }
+
+    /* ==============================
+       BACKTEST PREVIEW
+       ============================== */
+    .results { padding: 60px 0; border-top: 1px solid var(--border); }
+    .results h2 {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .results .subtitle { font-size: 14px; color: var(--text-4); margin-bottom: 40px; }
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: 40px;
+    }
+    .result-cell { background: var(--color-bg); padding: 20px; }
+    .result-cell .label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-5);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .result-cell .value {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-1);
+    }
+    .result-cell .value.positive { color: #4CAF50; }
+    .result-cell .value.negative { color: #E57373; }
+    .result-cell .value.highlight { color: var(--color-highlight); }
+    .result-cell .delta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-5);
+      margin-top: 4px;
+    }
+
+    /* Equity Chart */
+    .equity-chart {
+      border: 1px solid var(--border);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chart-header span {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-4);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .chart-legend { display: flex; gap: 16px; }
+    .chart-legend span {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-5);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chart-legend .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .chart-legend .dot.strategy { background: var(--color-highlight); }
+    .chart-legend .dot.benchmark { background: var(--line-buyhold); }
+    .chart-legend .dot.other { background: var(--text-5); }
+    .chart-axis {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-5);
+      margin-top: 8px;
+    }
+
+    /* Top Performers Table */
+    .top-table-scroll {
+      max-height: 380px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+    }
+    .top-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .top-table thead {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .top-table th {
+      text-align: left;
+      padding: 10px 12px;
+      font-weight: 500;
+      color: var(--text-4);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 11px;
+      border-bottom: 1px solid var(--border);
+      background: var(--color-bg);
+    }
+    .top-table td {
+      padding: 10px 12px;
+      color: var(--text-3);
+      border-bottom: 1px solid var(--border);
+    }
+    .top-table .win { color: #4CAF50; }
+    .top-table .loss { color: #E57373; }
+    .top-table tbody tr:first-child td { color: var(--color-highlight); }
+    .top-table tbody tr:first-child .win { color: var(--color-highlight); }
+    .top-table tbody tr:first-child .loss { color: var(--color-highlight); opacity: 0.7; }
+
+    /* Responsive column hiding */
+    .col-trades, .col-final, .col-winrate, .col-params {}
+
+    @media (max-width: 820px) {
+      .col-trades { display: none; }
+    }
+    @media (max-width: 720px) {
+      .col-final { display: none; }
+    }
+    @media (max-width: 620px) {
+      .col-winrate { display: none; }
+    }
+    @media (max-width: 520px) {
+      .col-params { display: none; }
+    }
+
+    /* ==============================
+       CODE SAMPLE
+       ============================== */
+    .code-section { padding: 60px 0; border-top: 1px solid var(--border); }
+    .code-section h2 {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .code-section .subtitle { font-size: 14px; color: var(--text-4); margin-bottom: 32px; }
+    .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 24px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      overflow-x: auto;
+      color: var(--text-2);
+    }
+    .code-block .comment { color: var(--text-5); }
+    .code-block .keyword { color: var(--color-highlight); }
+    .code-block .string { color: #81C784; }
+    .code-block .number { color: #FFB74D; }
+
+    /* ==============================
+       CTA
+       ============================== */
+    .cta {
+      padding: 80px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+    .cta h2 {
+      font-family: var(--font-mono);
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .cta p { font-size: 15px; color: var(--text-3); margin-bottom: 24px; font-weight: 300; }
+    .cta a { font-size: 15px; color: var(--text-2); }
+
+    /* ==============================
+       FOOTER
+       ============================== */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-5);
+      font-family: var(--font-mono);
+    }
+
+    /* ==============================
+       RESPONSIVE
+       ============================== */
+    @media (max-width: 640px) {
+      .features-grid { grid-template-columns: 1fr; gap: 40px; }
+      .results-grid { grid-template-columns: 1fr 1fr; }
+      .stack { width: 280px; height: 180px; }
+      .perspective-scene { height: 340px; padding-top: 30px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="/" class="logo">TrainBard</a>
+    <div class="nav-right">
+      <a href="#features">strategies</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">dark</button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero container">
+    <h1>Write strategies.<br>Test thousands in seconds.</h1>
+    <p>TrainBard compiles Pine Script through a custom engine and runs it against historical crypto data at scale.</p>
+    <div class="hero-links">
+      <a href="/cdn-cgi/l/email-protection#761e131a1a19360204171f18141704125815191b">request access</a>
+    </div>
+  </section>
+
+  <!-- 3D PERSPECTIVE GRAPHIC -->
+  <section class="perspective-section">
+    <div class="perspective-scene">
+      <div class="stack">
+
+        <!-- Layer 1: Raw OHLCV — dense, overwhelming -->
+        <div class="stack-layer">
+          <div class="layer-label">ohlcv · 7,344 candles</div>
+          <div class="data-grid-wide">
+            <div class="data-cell">67241</div><div class="data-cell">67389</div><div class="data-cell">66812</div><div class="data-cell">67102</div><div class="data-cell">2841</div><div class="data-cell">67450</div><div class="data-cell">66998</div><div class="data-cell">67215</div>
+            <div class="data-cell">66780</div><div class="data-cell">67122</div><div class="data-cell">66540</div><div class="data-cell">66891</div><div class="data-cell">3102</div><div class="data-cell">66920</div><div class="data-cell">66410</div><div class="data-cell">66755</div>
+            <div class="data-cell">67890</div><div class="data-cell">68102</div><div class="data-cell">67650</div><div class="data-cell">67940</div><div class="data-cell">4521</div><div class="data-cell">68200</div><div class="data-cell">67800</div><div class="data-cell">68050</div>
+            <div class="data-cell">68340</div><div class="data-cell">68510</div><div class="data-cell">68100</div><div class="data-cell">68280</div><div class="data-cell">2190</div><div class="data-cell">68400</div><div class="data-cell">68020</div><div class="data-cell">68310</div>
+            <div class="data-cell">67500</div><div class="data-cell">67820</div><div class="data-cell">67200</div><div class="data-cell">67650</div><div class="data-cell">3890</div><div class="data-cell">67700</div><div class="data-cell">67100</div><div class="data-cell">67580</div>
+            <div class="data-cell">69010</div><div class="data-cell">69245</div><div class="data-cell">68800</div><div class="data-cell">69100</div><div class="data-cell">5102</div><div class="data-cell">69300</div><div class="data-cell">68750</div><div class="data-cell">69080</div>
+          </div>
+        </div>
+
+        <!-- Layer 2: More data — volume, timestamps -->
+        <div class="stack-layer">
+          <div class="layer-label">index · timestamps · volume</div>
+          <div class="data-grid-wide">
+            <div class="data-cell">04-01</div><div class="data-cell">04-01</div><div class="data-cell">04-01</div><div class="data-cell">04-01</div><div class="data-cell">04-02</div><div class="data-cell">04-02</div><div class="data-cell">04-02</div><div class="data-cell">04-02</div>
+            <div class="data-cell">1.2M</div><div class="data-cell">0.8M</div><div class="data-cell">2.1M</div><div class="data-cell">1.5M</div><div class="data-cell">0.9M</div><div class="data-cell">1.8M</div><div class="data-cell">2.4M</div><div class="data-cell">1.1M</div>
+            <div class="data-cell">04-03</div><div class="data-cell">04-03</div><div class="data-cell">04-03</div><div class="data-cell">04-03</div><div class="data-cell">04-04</div><div class="data-cell">04-04</div><div class="data-cell">04-04</div><div class="data-cell">04-04</div>
+            <div class="data-cell">3.0M</div><div class="data-cell">1.4M</div><div class="data-cell">0.7M</div><div class="data-cell">1.9M</div><div class="data-cell">2.2M</div><div class="data-cell">1.6M</div><div class="data-cell">0.5M</div><div class="data-cell">1.3M</div>
+            <div class="data-cell">04-05</div><div class="data-cell">04-05</div><div class="data-cell">04-05</div><div class="data-cell">04-05</div><div class="data-cell">04-06</div><div class="data-cell">04-06</div><div class="data-cell">04-06</div><div class="data-cell">04-06</div>
+            <div class="data-cell">1.7M</div><div class="data-cell">2.8M</div><div class="data-cell">0.6M</div><div class="data-cell">1.0M</div><div class="data-cell">4.1M</div><div class="data-cell">2.0M</div><div class="data-cell">1.2M</div><div class="data-cell">0.9M</div>
+          </div>
+        </div>
+
+        <!-- Layer 3: Pine Script -->
+        <div class="stack-layer">
+          <div class="layer-label">strategy · pine script</div>
+          <div class="mini-code">
+            <span class="kw">//@version=5</span><br>
+            <span class="kw">strategy</span>(<span class="cm">"MA Cross"</span>, overlay=<span class="kw">true</span>)<br>
+            fast = <span class="kw">input.int</span>(<span class="cm">9</span>, <span class="cm">"Fast"</span>)<br>
+            slow = <span class="kw">input.int</span>(<span class="cm">21</span>, <span class="cm">"Slow"</span>)<br>
+            <span class="kw">if</span> <span class="kw">ta.crossover</span>(<span class="kw">ta.ema</span>(close,fast), <span class="kw">ta.ema</span>(close,slow))<br>
+            &nbsp;&nbsp;<span class="kw">strategy.entry</span>(<span class="cm">"L"</span>, <span class="kw">strategy.long</span>)
+          </div>
+        </div>
+
+        <!-- Layer 4: Parameter sweep — the grid of combinations -->
+        <div class="stack-layer">
+          <div class="layer-label">parameter sweep · 19,521 combinations</div>
+          <div class="param-grid">
+            <div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div>
+            <div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div>
+            <div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div>
+            <div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div>
+            <div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div>
+            <div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div>
+            <div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div>
+            <div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div>
+            <div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div>
+            <div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell"></div><div class="param-cell active"></div><div class="param-cell"></div>
+          </div>
+        </div>
+
+        <!-- Layer 5: Backtest iteration — many faint chaotic curves -->
+        <div class="stack-layer">
+          <div class="layer-label">backtesting · batch 1–9,760</div>
+          <div class="iter-lines">
+            <svg viewBox="0 0 310 65">
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.15" points="0,32 15,28 30,35 45,25 60,30 75,22 90,28 105,18 120,25 135,15 150,20 165,12 180,18 195,10 210,15 225,8 240,12 255,6 270,10 285,5 310,3" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.18" points="0,32 15,35 30,38 45,32 60,28 75,35 90,30 105,25 120,30 135,22 150,28 165,20 180,25 195,18 210,22 225,16 240,20 255,14 270,18 285,12 310,10" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.12" points="0,32 15,30 30,28 45,32 60,35 75,32 90,35 105,38 120,35 135,32 150,30 165,28 180,25 195,22 210,20 225,18 240,16 255,15 270,14 285,13 310,12" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.20" points="0,32 15,25 30,20 45,28 60,22 75,15 90,20 105,25 120,18 135,22 150,28 165,25 180,30 195,28 210,25 225,22 240,20 255,22 270,20 285,18 310,16" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.10" points="0,32 15,34 30,36 45,38 60,36 75,38 90,40 105,38 120,36 135,34 150,32 165,30 180,28 195,30 210,28 225,26 240,24 255,22 270,22 285,20 310,19" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.14" points="0,32 15,38 30,42 45,38 60,35 75,40 90,36 105,32 120,28 135,25 150,22 165,20 180,18 195,16 210,20 225,18 240,16 255,18 270,20 285,22 310,22" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.16" points="0,32 15,28 30,32 45,26 60,30 75,24 90,28 105,22 120,26 135,20 150,24 165,18 180,22 195,16 210,20 225,14 240,18 255,12 270,16 285,10 310,14" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.08" points="0,32 15,35 30,40 45,45 60,42 75,45 90,48 105,45 120,42 135,40 150,38 165,36 180,38 195,40 210,38 225,36 240,34 255,32 270,30 285,28 310,26" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.13" points="0,32 15,30 30,25 45,28 60,22 75,26 90,20 105,24 120,18 135,15 150,18 165,22 180,20 195,24 210,22 225,20 240,24 255,22 270,24 285,26 310,25" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.11" points="0,32 15,36 30,34 45,38 60,40 75,38 90,42 105,40 120,38 135,42 150,40 165,38 180,35 195,32 210,30 225,28 240,30 255,28 270,26 285,28 310,28" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.09" points="0,32 15,32 30,34 45,36 60,38 75,40 90,42 105,44 120,46 135,48 150,50 165,48 180,46 195,44 210,42 225,40 240,38 255,38 270,38 285,38 310,38" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.15" points="0,32 15,22 30,28 45,18 60,24 75,14 90,20 105,16 120,22 135,28 150,24 165,30 180,26 195,32 210,28 225,24 240,28 255,30 270,28 285,30 310,30" />
+            </svg>
+          </div>
+        </div>
+
+        <!-- Layer 6: More backtests — curves tighter, converging -->
+        <div class="stack-layer">
+          <div class="layer-label">backtesting · batch 9,761–19,521</div>
+          <div class="iter-lines">
+            <svg viewBox="0 0 310 65">
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.20" points="0,35 15,30 30,28 45,32 60,26 75,22 90,18 105,22 120,16 135,20 150,14 165,18 180,12 195,16 210,10 225,14 240,8 255,12 270,8 285,6 310,5" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.18" points="0,35 15,32 30,35 45,30 60,28 75,25 90,28 105,24 120,20 135,18 150,22 165,18 180,15 195,12 210,16 225,12 240,10 255,8 270,10 285,8 310,7" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.14" points="0,35 15,38 30,36 45,32 60,30 75,28 90,25 105,28 120,24 135,22 150,20 165,18 180,16 195,14 210,12 225,10 240,12 255,14 270,12 285,10 310,9" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.22" points="0,35 15,28 30,24 45,28 60,20 75,24 90,18 105,14 120,18 135,12 150,16 165,10 180,14 195,8 210,12 225,8 240,10 255,8 270,6 285,8 310,10" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.12" points="0,35 15,34 30,32 45,35 60,38 75,35 90,32 105,30 120,28 135,26 150,24 165,22 180,20 195,18 210,16 225,18 240,16 255,14 270,14 285,14 310,14" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.16" points="0,35 15,32 30,30 45,28 60,32 75,28 90,25 105,22 120,25 135,20 150,22 165,18 180,15 195,18 210,14 225,12 240,14 255,16 270,14 285,16 310,16" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.10" points="0,35 15,40 30,42 45,40 60,38 75,36 90,38 105,36 120,34 135,32 150,30 165,28 180,30 195,28 210,26 225,24 240,22 255,20 270,18 285,18 310,18" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.19" points="0,35 15,30 30,25 45,30 60,24 75,20 90,16 105,20 120,15 135,18 150,12 165,15 180,10 195,12 210,14 225,16 240,18 255,20 270,18 285,20 310,20" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.08" points="0,35 15,36 30,38 45,40 60,42 75,40 90,42 105,44 120,42 135,40 150,38 165,36 180,34 195,32 210,30 225,28 240,26 255,24 270,22 285,22 310,22" />
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.5" opacity="0.13" points="0,35 15,32 30,28 45,32 60,28 75,32 90,28 105,24 120,28 135,24 150,20 165,24 180,20 195,16 210,20 225,22 240,20 255,22 270,24 285,24 310,24" />
+            </svg>
+          </div>
+        </div>
+
+        <!-- Layer 7: Evaluation — metrics condensing -->
+        <div class="stack-layer">
+          <div class="layer-label">ranking · evaluation</div>
+          <div class="mini-code">
+            <span class="cm">sorting 19,521 results by return...</span><br>
+            <span>rank 1: fast=<span class="kw">56</span> slow=<span class="kw">62</span> → <span class="kw">+52.11%</span></span><br>
+            <span>rank 2: fast=<span class="kw">56</span> slow=<span class="kw">61</span> → <span class="kw">+46.67%</span></span><br>
+            <span>rank 3: fast=<span class="kw">57</span> slow=<span class="kw">60</span> → <span class="kw">+46.52%</span></span><br>
+            <span class="cm">...19,518 more</span><br>
+            <span>buy&hold: <span class="cm">-8.15%</span></span>
+          </div>
+        </div>
+
+        <!-- Layer 8: The winner — single clean equity curve -->
+        <div class="stack-layer">
+          <div class="layer-label"><span class="layer-highlight">▸ best result · +52.11%</span></div>
+          <div class="iter-lines">
+            <svg viewBox="0 0 310 65">
+              <!-- Faint ghost of buy & hold -->
+              <polyline fill="none" stroke="var(--text-5)" stroke-width="0.6" stroke-dasharray="2,2"
+                points="0,30 30,28 60,30 90,35 120,38 150,36 180,38 210,40 240,38 270,40 310,42" />
+              <!-- The winner -->
+              <polyline fill="none" stroke="var(--color-highlight)" stroke-width="1.5"
+                points="0,30 20,26 40,22 60,18 80,22 100,16 120,12 140,15 160,10 180,8 200,12 220,6 240,4 260,6 280,3 310,2" />
+            </svg>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features container" id="features">
+    <div class="features-grid">
+      <div class="feature">
+        <h3>Pine Script Compiler</h3>
+        <p>Write strategies in Pine Script — the same language used on TradingView — and run them directly in TrainBard. Our custom-built compiler translates your logic into a high-speed runtime.</p>
+        <div class="feature-detail">
+          <span class="hl">▸</span> Supports indicators, strategy entries/exits<br>
+          <span class="hl">▸</span> ta.ema, ta.sma, ta.rsi, ta.crossover<br>
+          <span class="hl">▸</span> Variable declarations, conditionals, loops<br>
+          <span class="hl">▸</span> Expanding coverage — not all features live yet
+        </div>
+      </div>
+      <div class="feature">
+        <h3>Mass Backtesting Engine</h3>
+        <p>Test parameter combinations at scale. Our engine processes tens of thousands of backtest permutations in seconds against historical crypto market data.</p>
+        <div class="feature-detail">
+          <span class="hl">▸</span> ~19,500 backtests in under 10 seconds<br>
+          <span class="hl">▸</span> BTC, ETH, SOL + major pairs<br>
+          <span class="hl">▸</span> 1m, 5m, 15m, 1h, 4h, 1d candles<br>
+          <span class="hl">▸</span> Full trade log + equity curves
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BACKTEST PREVIEW -->
+  <section class="results container">
+    <h2>19,521 backtests, one strategy</h2>
+    <p class="subtitle">Moving Average Cross on BTC/USDT, 1h candles, Apr 2025 – Feb 2026. Every fast/slow length combination tested. Here's what surfaced.</p>
+
+    <div class="results-grid">
+      <div class="result-cell">
+        <div class="label">Best Return</div>
+        <div class="value positive">+52.1%</div>
+        <div class="delta">fast 56 / slow 62</div>
+      </div>
+      <div class="result-cell">
+        <div class="label">Combinations</div>
+        <div class="value highlight">19,521</div>
+        <div class="delta">parameter sweep</div>
+      </div>
+      <div class="result-cell">
+        <div class="label">Buy &amp; Hold</div>
+        <div class="value negative">-8.2%</div>
+        <div class="delta">same period</div>
+      </div>
+      <div class="result-cell">
+        <div class="label">Best Win Rate</div>
+        <div class="value">54.5%</div>
+        <div class="delta">fast 57 / slow 60</div>
+      </div>
+    </div>
+
+    <!-- Equity Curve — 25 lines with real personality -->
+    <div class="equity-chart">
+      <div class="chart-header">
+        <span>Equity Curves — Top 25 vs. Buy &amp; Hold</span>
+        <div class="chart-legend">
+          <span><span class="dot strategy"></span> Best</span>
+          <span><span class="dot other"></span> Top 25</span>
+          <span><span class="dot benchmark"></span> Buy &amp; Hold</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 900 240" width="100%" height="240" preserveAspectRatio="none">
+        <!-- Grid -->
+        <line x1="0" y1="40" x2="900" y2="40" stroke="var(--border)" stroke-width="0.5" />
+        <line x1="0" y1="100" x2="900" y2="100" stroke="var(--border)" stroke-width="0.5" />
+        <line x1="0" y1="160" x2="900" y2="160" stroke="var(--border)" stroke-width="0.5" />
+        <line x1="0" y1="220" x2="900" y2="220" stroke="var(--border)" stroke-width="0.5" />
+
+        <!-- Y labels -->
+        <text x="4" y="37" font-family="var(--font-mono)" font-size="9" fill="var(--text-5)">+60%</text>
+        <text x="4" y="97" font-family="var(--font-mono)" font-size="9" fill="var(--text-5)">+30%</text>
+        <text x="4" y="157" font-family="var(--font-mono)" font-size="9" fill="var(--text-5)">0%</text>
+        <text x="4" y="217" font-family="var(--font-mono)" font-size="9" fill="var(--text-5)">-15%</text>
+
+        <!--
+          24 "other" strategy lines. All end between ~65-90.
+          Two lines overtake blue near the end but fall back at the finish.
+          Each has distinct character: early leaders, late bloomers,
+          volatile paths, drawdowns, plateaus.
+        -->
+
+        <!-- A: rockets early, LEADS blue at 750, collapses at end -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.45"
+          points="0,160 40,142 80,125 120,110 160,95 200,82 240,75 280,68 320,62 360,58 400,52 440,48 480,55 520,50 560,46 600,42 640,45 680,50 720,48 760,55 800,62 840,68 900,70" />
+
+        <!-- B: slow start, massive mid surge, OVERTAKES blue around 800, drops at finish -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.40"
+          points="0,160 40,162 80,165 120,158 160,155 200,148 240,135 280,118 320,100 360,88 400,78 440,72 480,65 520,58 560,52 600,48 640,50 680,55 720,50 760,48 800,52 840,60 900,68" />
+
+        <!-- C: choppy throughout, lots of reversals -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.32"
+          points="0,160 40,150 80,158 120,142 160,152 200,138 240,148 280,132 320,140 360,125 400,135 440,120 480,128 520,115 560,122 600,108 640,100 680,95 720,88 760,82 800,78 840,74 900,72" />
+
+        <!-- D: big early drawdown then strong recovery -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.30"
+          points="0,160 40,170 80,180 120,175 160,168 200,155 240,145 280,135 320,125 360,118 400,108 440,100 480,92 520,86 560,82 600,78 640,76 680,74 720,72 760,72 800,74 840,76 900,75" />
+
+        <!-- E: steady grinder, very smooth path -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.28"
+          points="0,160 40,156 80,152 120,148 160,142 200,138 240,132 280,126 320,120 360,114 400,108 440,102 480,96 520,92 560,88 600,84 640,82 680,80 720,78 760,76 800,76 840,76 900,76" />
+
+        <!-- F: plateau mid, then late surge -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.25"
+          points="0,160 40,155 80,148 120,144 160,142 200,140 240,140 280,138 320,138 360,136 400,135 440,130 480,120 520,108 560,98 600,90 640,85 680,82 720,80 760,78 800,78 840,78 900,78" />
+
+        <!-- G: early leader that fades to middle of pack -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.30"
+          points="0,160 40,140 80,128 120,118 160,112 200,108 240,105 280,108 320,112 360,115 400,110 440,105 480,100 520,98 560,95 600,92 640,88 680,85 720,82 760,82 800,80 840,80 900,80" />
+
+        <!-- H: volatile, swings ±15 at a time -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.22"
+          points="0,160 40,145 80,160 120,138 160,155 200,132 240,150 280,128 320,145 360,120 400,138 440,115 480,130 520,108 560,120 600,102 640,95 680,108 720,92 760,85 800,82 840,82 900,82" />
+
+        <!-- I: double dip — two distinct drawdowns -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.26"
+          points="0,160 40,148 80,138 120,142 160,155 200,148 240,135 280,125 320,118 360,128 400,140 440,132 480,118 520,108 560,100 600,92 640,88 680,85 720,84 760,84 800,84 840,84 900,84" />
+
+        <!-- J: late bloomer, flat for 60% then climbs -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.24"
+          points="0,160 40,162 80,160 120,162 160,158 200,160 240,158 280,155 320,155 360,150 400,145 440,138 480,128 520,118 560,108 600,100 640,95 680,92 720,90 760,88 800,86 840,86 900,85" />
+
+        <!-- K: strong start, long flat middle, slight fade -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.22"
+          points="0,160 40,145 80,132 120,122 160,118 200,115 240,112 280,112 320,112 360,110 400,110 440,108 480,108 520,105 560,102 600,100 640,96 680,94 720,92 760,90 800,88 840,88 900,88" />
+
+        <!-- L: mirror of blue for first half, diverges down -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.20"
+          points="0,160 40,148 80,140 120,132 160,138 200,128 240,120 280,118 320,122 360,118 400,115 440,112 480,108 520,105 560,102 600,100 640,98 720,95 760,92 800,90 840,90 900,90" />
+
+        <!-- M: starts negative then powers through -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.22"
+          points="0,160 40,168 80,175 120,172 160,165 200,158 240,148 280,140 320,132 360,128 400,120 440,115 480,108 520,102 560,98 600,95 640,92 720,90 760,90 800,90 840,90 900,90" />
+
+        <!-- N: sawtooth — three clear up-legs with pullbacks -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.20"
+          points="0,160 40,148 80,138 120,148 160,138 200,128 240,138 280,125 320,115 360,125 400,112 440,105 480,112 520,102 560,95 600,100 640,95 680,92 720,92 760,92 800,92 840,92 900,92" />
+
+        <!-- O: gradual, extremely steady, ends mid-pack -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.18"
+          points="0,160 40,158 80,155 120,152 160,148 200,145 240,140 280,136 320,132 360,128 400,124 440,120 480,116 520,112 560,108 600,105 640,102 680,100 720,98 760,96 800,95 840,94 900,94" />
+
+        <!-- P: aggressive early, big mid crash, partial recovery -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.18"
+          points="0,160 40,138 80,120 120,108 160,100 200,95 240,110 280,128 320,138 360,130 400,120 440,112 480,105 520,100 560,98 600,96 640,96 680,96 720,96 760,96 800,96 840,96 900,96" />
+
+        <!-- Q: oscillating around the mean, settles late -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.16"
+          points="0,160 40,155 80,162 120,150 160,158 200,145 240,152 280,140 320,148 360,135 400,142 440,130 480,125 520,118 560,112 600,108 640,105 680,102 720,100 760,98 800,98 840,98 900,98" />
+
+        <!-- R: classic momentum — accelerates in last third -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.18"
+          points="0,160 40,160 80,158 120,158 160,156 200,155 240,152 280,150 320,148 360,145 400,140 440,132 480,122 520,112 560,108 600,104 640,102 680,100 720,100 760,100 800,100 840,100 900,100" />
+
+        <!-- S: early promise, long grind, disappointing finish -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.16"
+          points="0,160 40,142 80,130 120,125 160,128 200,132 240,128 280,125 320,122 360,118 400,115 440,112 480,110 520,108 560,106 600,105 640,104 680,103 720,102 760,102 800,102 840,102 900,102" />
+
+        <!-- T: choppy but trending, lots of noise -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.15"
+          points="0,160 40,155 80,165 120,152 160,160 200,148 240,155 280,142 320,150 360,138 400,145 440,132 480,128 520,122 560,118 600,115 640,112 680,108 720,106 760,105 800,104 840,104 900,104" />
+
+        <!-- U: flatliner for half, then breakout, then sideways -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.15"
+          points="0,160 40,160 80,162 120,160 160,160 200,158 240,158 280,155 320,142 360,130 400,120 440,115 480,112 520,110 560,108 600,108 640,108 680,108 720,106 760,106 800,106 840,106 900,106" />
+
+        <!-- V: inverse of blue in first half, converges later -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.14"
+          points="0,160 40,165 80,170 120,165 160,158 200,150 240,145 280,138 320,132 360,128 400,125 440,120 480,118 520,115 560,112 600,110 640,110 680,110 720,108 760,108 800,108 840,108 900,108" />
+
+        <!-- W: mini bubble then long fade to low finish -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.14"
+          points="0,160 40,145 80,130 120,120 160,118 200,120 240,125 280,128 320,128 360,125 400,122 440,120 480,118 520,116 560,114 600,112 640,112 680,112 720,112 760,112 800,112 840,112 900,112" />
+
+        <!-- X: last place — barely profitable, lots of chop -->
+        <polyline fill="none" stroke="var(--text-5)" stroke-width="0.8" opacity="0.12"
+          points="0,160 40,158 80,162 120,158 160,165 200,160 240,158 280,155 320,152 360,148 400,150 440,145 480,142 520,138 560,135 600,132 640,128 680,125 720,122 760,120 800,118 840,116 900,115" />
+
+        <!-- Buy & Hold (black/white, solid) — ends down -->
+        <polyline fill="none" stroke="var(--line-buyhold)" stroke-width="1.2"
+          points="0,160 40,155 80,152 120,158 160,165 200,172 240,168 280,165 320,170 360,175 400,172 440,175 480,178 520,176 560,180 600,178 640,175 680,180 720,182 760,185 800,184 840,186 900,185" />
+
+        <!-- BEST strategy (blue) — has real dips but ends highest -->
+        <polyline fill="none" stroke="var(--color-highlight)" stroke-width="2"
+          points="0,160 40,148 80,138 120,130 160,140 200,128 240,118 280,112 320,122 360,110 400,100 440,108 480,95 520,88 560,82 600,90 640,80 680,72 720,65 760,58 800,52 840,50 900,48" />
+      </svg>
+      <div class="chart-axis">
+        <span>Apr 2025</span>
+        <span>Jun</span>
+        <span>Aug</span>
+        <span>Oct</span>
+        <span>Dec</span>
+        <span>Feb 2026</span>
+      </div>
+    </div>
+
+    <!-- Top 25 Performers Table -->
+    <div class="top-table-scroll">
+      <table class="top-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th class="col-params">Fast</th>
+            <th class="col-params">Slow</th>
+            <th>Return</th>
+            <th class="col-winrate">Win Rate</th>
+            <th class="col-trades">Trades</th>
+            <th>Max DD</th>
+            <th class="col-final">Final Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td class="col-params">56</td>
+            <td class="col-params">62</td>
+            <td class="win">+52.11%</td>
+            <td class="col-winrate">52.73%</td>
+            <td class="col-trades">220</td>
+            <td class="loss">$1,839</td>
+            <td class="col-final">$15,211</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td class="col-params">56</td>
+            <td class="col-params">61</td>
+            <td class="win">+46.67%</td>
+            <td class="col-winrate">50.39%</td>
+            <td class="col-trades">258</td>
+            <td class="loss">$2,179</td>
+            <td class="col-final">$14,667</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td class="col-params">57</td>
+            <td class="col-params">60</td>
+            <td class="win">+46.52%</td>
+            <td class="col-winrate">54.55%</td>
+            <td class="col-trades">330</td>
+            <td class="loss">$1,789</td>
+            <td class="col-final">$14,652</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td class="col-params">57</td>
+            <td class="col-params">59</td>
+            <td class="win">+46.26%</td>
+            <td class="col-winrate">53.69%</td>
+            <td class="col-trades">406</td>
+            <td class="loss">$2,330</td>
+            <td class="col-final">$14,626</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td class="col-params">58</td>
+            <td class="col-params">62</td>
+            <td class="win">+46.17%</td>
+            <td class="col-winrate">52.24%</td>
+            <td class="col-trades">268</td>
+            <td class="loss">$1,420</td>
+            <td class="col-final">$14,617</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td class="col-params">57</td>
+            <td class="col-params">61</td>
+            <td class="win">+46.05%</td>
+            <td class="col-winrate">52.90%</td>
+            <td class="col-trades">276</td>
+            <td class="loss">$1,679</td>
+            <td class="col-final">$14,605</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td class="col-params">55</td>
+            <td class="col-params">62</td>
+            <td class="win">+46.04%</td>
+            <td class="col-winrate">51.43%</td>
+            <td class="col-trades">210</td>
+            <td class="loss">$1,837</td>
+            <td class="col-final">$14,604</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td class="col-params">56</td>
+            <td class="col-params">63</td>
+            <td class="win">+45.09%</td>
+            <td class="col-winrate">52.38%</td>
+            <td class="col-trades">210</td>
+            <td class="loss">$1,891</td>
+            <td class="col-final">$14,509</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td class="col-params">56</td>
+            <td class="col-params">60</td>
+            <td class="win">+44.53%</td>
+            <td class="col-winrate">51.82%</td>
+            <td class="col-trades">274</td>
+            <td class="loss">$2,194</td>
+            <td class="col-final">$14,453</td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td class="col-params">53</td>
+            <td class="col-params">62</td>
+            <td class="win">+44.32%</td>
+            <td class="col-winrate">48.08%</td>
+            <td class="col-trades">208</td>
+            <td class="loss">$2,372</td>
+            <td class="col-final">$14,432</td>
+          </tr>
+          <tr>
+            <td>11</td>
+            <td class="col-params">55</td>
+            <td class="col-params">64</td>
+            <td class="win">+44.23%</td>
+            <td class="col-winrate">51.65%</td>
+            <td class="col-trades">182</td>
+            <td class="loss">$2,325</td>
+            <td class="col-final">$14,423</td>
+          </tr>
+          <tr>
+            <td>12</td>
+            <td class="col-params">22</td>
+            <td class="col-params">21</td>
+            <td class="win">+44.21%</td>
+            <td class="col-winrate">59.45%</td>
+            <td class="col-trades">943</td>
+            <td class="loss">$3,203</td>
+            <td class="col-final">$14,421</td>
+          </tr>
+          <tr>
+            <td>13</td>
+            <td class="col-params">56</td>
+            <td class="col-params">64</td>
+            <td class="win">+43.61%</td>
+            <td class="col-winrate">52.04%</td>
+            <td class="col-trades">196</td>
+            <td class="loss">$1,965</td>
+            <td class="col-final">$14,361</td>
+          </tr>
+          <tr>
+            <td>14</td>
+            <td class="col-params">50</td>
+            <td class="col-params">65</td>
+            <td class="win">+43.13%</td>
+            <td class="col-winrate">48.00%</td>
+            <td class="col-trades">150</td>
+            <td class="loss">$2,213</td>
+            <td class="col-final">$14,313</td>
+          </tr>
+          <tr>
+            <td>15</td>
+            <td class="col-params">55</td>
+            <td class="col-params">61</td>
+            <td class="win">+42.99%</td>
+            <td class="col-winrate">51.69%</td>
+            <td class="col-trades">236</td>
+            <td class="loss">$2,230</td>
+            <td class="col-final">$14,299</td>
+          </tr>
+          <tr>
+            <td>16</td>
+            <td class="col-params">23</td>
+            <td class="col-params">20</td>
+            <td class="win">+42.93%</td>
+            <td class="col-winrate">58.36%</td>
+            <td class="col-trades">563</td>
+            <td class="loss">$3,083</td>
+            <td class="col-final">$14,293</td>
+          </tr>
+          <tr>
+            <td>17</td>
+            <td class="col-params">57</td>
+            <td class="col-params">58</td>
+            <td class="win">+42.53%</td>
+            <td class="col-winrate">54.51%</td>
+            <td class="col-trades">554</td>
+            <td class="loss">$2,524</td>
+            <td class="col-final">$14,253</td>
+          </tr>
+          <tr>
+            <td>18</td>
+            <td class="col-params">58</td>
+            <td class="col-params">60</td>
+            <td class="win">+42.52%</td>
+            <td class="col-winrate">51.01%</td>
+            <td class="col-trades">396</td>
+            <td class="loss">$1,694</td>
+            <td class="col-final">$14,252</td>
+          </tr>
+          <tr>
+            <td>19</td>
+            <td class="col-params">42</td>
+            <td class="col-params">67</td>
+            <td class="win">+42.43%</td>
+            <td class="col-winrate">43.75%</td>
+            <td class="col-trades">129</td>
+            <td class="loss">$1,733</td>
+            <td class="col-final">$14,243</td>
+          </tr>
+          <tr>
+            <td>20</td>
+            <td class="col-params">41</td>
+            <td class="col-params">67</td>
+            <td class="win">+42.24%</td>
+            <td class="col-winrate">45.90%</td>
+            <td class="col-trades">123</td>
+            <td class="loss">$1,674</td>
+            <td class="col-final">$14,224</td>
+          </tr>
+          <tr>
+            <td>21</td>
+            <td class="col-params">55</td>
+            <td class="col-params">63</td>
+            <td class="win">+41.92%</td>
+            <td class="col-winrate">50.50%</td>
+            <td class="col-trades">202</td>
+            <td class="loss">$2,028</td>
+            <td class="col-final">$14,192</td>
+          </tr>
+          <tr>
+            <td>22</td>
+            <td class="col-params">58</td>
+            <td class="col-params">63</td>
+            <td class="win">+41.82%</td>
+            <td class="col-winrate">51.91%</td>
+            <td class="col-trades">262</td>
+            <td class="loss">$1,454</td>
+            <td class="col-final">$14,182</td>
+          </tr>
+          <tr>
+            <td>23</td>
+            <td class="col-params">43</td>
+            <td class="col-params">66</td>
+            <td class="win">+41.65%</td>
+            <td class="col-winrate">44.78%</td>
+            <td class="col-trades">134</td>
+            <td class="loss">$1,860</td>
+            <td class="col-final">$14,165</td>
+          </tr>
+          <tr>
+            <td>24</td>
+            <td class="col-params">58</td>
+            <td class="col-params">61</td>
+            <td class="win">+41.53%</td>
+            <td class="col-winrate">51.53%</td>
+            <td class="col-trades">326</td>
+            <td class="loss">$1,524</td>
+            <td class="col-final">$14,153</td>
+          </tr>
+          <tr>
+            <td>25</td>
+            <td class="col-params">24</td>
+            <td class="col-params">20</td>
+            <td class="win">+41.46%</td>
+            <td class="col-winrate">60.41%</td>
+            <td class="col-trades">491</td>
+            <td class="loss">$2,866</td>
+            <td class="col-final">$14,146</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CODE SAMPLE -->
+  <section class="code-section container">
+    <h2>What you write</h2>
+    <p class="subtitle">Standard Pine Script — paste from TradingView or write from scratch.</p>
+    <div class="code-block">
+      <span class="comment">// @version=5</span><br>
+      <span class="keyword">strategy</span>(<span class="string">"EMA Crossover"</span>, overlay=<span class="keyword">true</span>)<br><br>
+      <span class="comment">// Parameters</span><br>
+      fastLen = <span class="keyword">input.int</span>(<span class="number">9</span>, <span class="string">"Fast EMA"</span>)<br>
+      slowLen = <span class="keyword">input.int</span>(<span class="number">21</span>, <span class="string">"Slow EMA"</span>)<br><br>
+      <span class="comment">// Indicators</span><br>
+      fastEMA = <span class="keyword">ta.ema</span>(close, fastLen)<br>
+      slowEMA = <span class="keyword">ta.ema</span>(close, slowLen)<br><br>
+      <span class="comment">// Entry logic</span><br>
+      <span class="keyword">if</span> <span class="keyword">ta.crossover</span>(fastEMA, slowEMA)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">strategy.entry</span>(<span class="string">"Long"</span>, <span class="keyword">strategy.long</span>)<br><br>
+      <span class="keyword">if</span> <span class="keyword">ta.crossunder</span>(fastEMA, slowEMA)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">strategy.close</span>(<span class="string">"Long"</span>)
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta container">
+    <h2>Start backtesting</h2>
+    <p>TrainBard is in early access.</p>
+    <a href="/cdn-cgi/l/email-protection#d5bdb0b9b9ba95a1a7b4bcbbb7b4a7b1fbb6bab8">request access</a>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <span>TrainBard © 2025</span>
+  </footer>
+
+  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    // Theme toggle
+    const toggle = document.getElementById('themeToggle');
+    const html = document.documentElement;
+    toggle.addEventListener('click', () => {
+      const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      html.setAttribute('data-theme', next);
+      toggle.textContent = next === 'light' ? 'dark' : 'light';
+    });
+
+    // Scroll-driven accordion for 3D stack
+    (function() {
+      const scene = document.querySelector('.perspective-scene');
+      const layers = document.querySelectorAll('.stack-layer');
+      if (!scene || !layers.length) return;
+
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      function update() {
+        const rect = scene.getBoundingClientRect();
+        const vh = window.innerHeight;
+
+        // Progress: 0 when section enters bottom of viewport,
+        // 1 when section center reaches upper portion of viewport.
+        const sectionCenter = rect.top + rect.height * 0.5;
+        const start = vh;
+        const end = vh * 0.15;
+
+        let t = 1 - (sectionCenter - end) / (start - end);
+        t = Math.max(0, Math.min(1, t));
+
+        // Ease-out for snappy feel
+        const eased = 1 - (1 - t) * (1 - t);
+
+        layers.forEach(function(layer) {
+          const cs = getComputedStyle(layer);
+          const collapsed = parseFloat(cs.getPropertyValue('--layer-z-collapsed'));
+          const expanded = parseFloat(cs.getPropertyValue('--layer-z-expanded'));
+          const z = lerp(collapsed, expanded, eased);
+          layer.style.transform = 'translateZ(' + z + 'px)';
+        });
+
+        requestAnimationFrame(update);
+      }
+
+      requestAnimationFrame(update);
+    })();
+  </script>
+
+</body>
+</html>
