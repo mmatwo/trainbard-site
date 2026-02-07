@@ -503,6 +503,83 @@
     .cta a { font-size: 15px; color: var(--text-2); }
 
     /* ==============================
+       REQUEST ACCESS MODAL
+       ============================== */
+    .request-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .request-modal.open { display: flex; }
+    .request-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.58);
+      backdrop-filter: blur(2px);
+    }
+    .request-modal-panel {
+      position: relative;
+      width: min(700px, calc(100vw - 24px));
+      height: min(88vh, 840px);
+      background: var(--color-bg);
+      border: 1px solid var(--border);
+      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.35);
+      z-index: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: modal-in 180ms ease-out;
+    }
+    .request-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex: 0 0 auto;
+    }
+    .request-modal-title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-2);
+    }
+    .request-modal-close {
+      border: 1px solid var(--border);
+      background: var(--color-bg);
+      color: var(--text-2);
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1;
+      padding: 8px 10px;
+      flex: 0 0 auto;
+    }
+    .request-modal-close:hover {
+      color: var(--text-1);
+      border-color: var(--text-3);
+    }
+    .request-modal-frame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: var(--color-bg);
+      flex: 1 1 auto;
+    }
+    body.modal-open { overflow: hidden; }
+    @keyframes modal-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ==============================
        FOOTER
        ============================== */
     footer {
@@ -522,6 +599,12 @@
       .results-grid { grid-template-columns: 1fr 1fr; }
       .stack { width: 280px; height: 180px; }
       .perspective-scene { height: 340px; padding-top: 30px; }
+      .request-modal { padding: 10px; }
+      .request-modal-panel {
+        width: 100%;
+        height: 90vh;
+      }
+      .request-modal-header { padding: 10px 10px 10px 12px; }
     }
   </style>
 </head>
@@ -541,7 +624,7 @@
     <h1>Write strategies.<br>Test thousands in seconds.</h1>
     <p>TrainBard compiles Pine Script through a custom engine and runs it against historical crypto data at scale.</p>
     <div class="hero-links">
-      <a href="/cdn-cgi/l/email-protection#761e131a1a19360204171f18141704125815191b">request access</a>
+      <a href="#" data-request-access>request access</a>
     </div>
   </section>
 
@@ -1172,8 +1255,26 @@
   <section class="cta container">
     <h2>Start backtesting</h2>
     <p>TrainBard is in early access.</p>
-    <a href="/cdn-cgi/l/email-protection#d5bdb0b9b9ba95a1a7b4bcbbb7b4a7b1fbb6bab8">request access</a>
+    <a href="#" data-request-access>request access</a>
   </section>
+
+  <div class="request-modal" id="requestModal" aria-hidden="true">
+    <div class="request-modal-backdrop" data-request-close></div>
+    <div class="request-modal-panel" role="dialog" aria-modal="true" aria-labelledby="requestModalTitle">
+      <div class="request-modal-header">
+        <div class="request-modal-title" id="requestModalTitle">Request Access</div>
+        <button type="button" class="request-modal-close" data-request-close aria-label="Close request access form">close</button>
+      </div>
+      <iframe
+        class="request-modal-frame"
+        src="https://docs.google.com/forms/d/e/1FAIpQLScgp9jH79fesKhNYp686IYhMTfMOV0EdU8JHjCHE0UXH0pwmQ/viewform?embedded=true"
+        title="TrainBard request access form"
+        loading="lazy"
+        marginheight="0"
+        marginwidth="0"
+      >Loading…</iframe>
+    </div>
+  </div>
 
   <!-- FOOTER -->
   <footer>
@@ -1228,6 +1329,44 @@
       }
 
       requestAnimationFrame(update);
+    })();
+
+    // Request access modal
+    (function() {
+      const modal = document.getElementById('requestModal');
+      const openLinks = document.querySelectorAll('[data-request-access]');
+      const closeTargets = modal ? modal.querySelectorAll('[data-request-close]') : [];
+
+      if (!modal || !openLinks.length) return;
+
+      function openModal() {
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+      }
+
+      function closeModal() {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+      }
+
+      openLinks.forEach(function(link) {
+        link.addEventListener('click', function(event) {
+          event.preventDefault();
+          openModal();
+        });
+      });
+
+      closeTargets.forEach(function(target) {
+        target.addEventListener('click', closeModal);
+      });
+
+      document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && modal.classList.contains('open')) {
+          closeModal();
+        }
+      });
     })();
   </script>
 
